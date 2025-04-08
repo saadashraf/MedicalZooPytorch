@@ -8,7 +8,7 @@ class DiceLoss(_AbstractDiceLoss):
     For multi-class segmentation `weight` parameter can be used to assign different weights per class.
     """
 
-    def __init__(self, classes=4, skip_index_after=None, weight=None, sigmoid_normalization=True ):
+    def __init__(self, classes=4, skip_index_after=None, weight=None, sigmoid_normalization=True):
         super().__init__(weight, sigmoid_normalization)
         self.classes = classes
         if skip_index_after is not None:
