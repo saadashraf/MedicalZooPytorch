@@ -1,62 +1,153 @@
 import argparse
 import os
+import re
 
+import nibabel as nib
+import numpy as np
 import torch
-import torch.nn.functional as F
+from torch.utils.data import DataLoader
 
+import lib.medzoo as medzoo
 # Lib files
 import lib.utils as utils
-import lib.medloaders as medical_loaders
-import lib.medzoo as medzoo
-from lib.visual3D_temp import non_overlap_padding,test_padding
 from lib.losses3D import DiceLoss
-#
+from lib.losses3D.hausdorff_distance import compute_hd
+from lib.medloaders import IXISegmentation
+from lib.utils import prepare_input
+
 
 def main():
     args = get_arguments()
-    #os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    ## FOR REPRODUCIBILITY OF RESULTS
     seed = 1777777
     utils.reproducibility(args, seed)
 
+    included_files = get_included_files("../datasets/ixi_segmentation/original_data", "IOP")
+    # included_files = ['189', '280', '504', '599', '608']
 
+    test_dataset = IXISegmentation(mode='test', args=args)
+    test_generator = DataLoader(test_dataset)
 
-    training_generator, val_generator, full_volume, affine = medical_loaders.generate_datasets(args,
-                                                                                               path='./datasets')
     model, optimizer = medzoo.create_model(args)
-    #
+
     criterion = DiceLoss(classes=args.classes)
-    #
-    # ## TODO LOAD PRETRAINED MODEL
-    print(affine.shape)
     model.restore_checkpoint(args.pretrained)
     if args.cuda:
-        model = model.cuda()
-        full_volume = full_volume.cuda()
+        model = model.to(device='mps')
         print("Model transferred in GPU.....")
-    x = torch.randn(3,156,240,240).cuda()
-    print(full_volume.shape)
-    output = non_overlap_padding(args,full_volume,model,criterion,kernel_dim=(32,32,32))
-    ## TODO TARGET FOR LOSS
 
-    #print(loss_dice)
+    loss, std, per_channel_loss_mean, per_channel_loss_std, \
+        hd_loss, hd_std, hd_loss_per_channel, hd_std_per_channel = infer_volume(model, criterion, test_generator, args)
+
+    print(loss, std, per_channel_loss_mean, per_channel_loss_std,
+          hd_loss, hd_std, hd_loss_per_channel, hd_std_per_channel)
+
+
+def infer_volume(model, criterion, loader, args):
+    model.eval()
+    losses = []
+    hd_loss_per_channel = []
+    all_per_channel_loss = []
+
+    for batch_idx, inputs in enumerate(loader):
+        input_tuple = inputs[:-1]
+        input_filename = inputs[-1]
+
+        with torch.no_grad():
+            input_tensor, target = prepare_input(input_tuple=input_tuple, args=args)
+            input_tensor.requires_grad = False
+
+            output = model(input_tensor)
+
+            for i in range(output.shape[0]):
+                save_images(output[i], input_filename[i].split(".")[0])
+
+            loss, per_ch_score = criterion(output, target)
+
+            for i in range(len(output)):
+                hd_loss_per_channel.append(compute_hd(output[i], target[i]) / len(output))
+
+            losses.append(loss.item())
+            all_per_channel_loss.append(per_ch_score)
+
+            print(f"The losses are: {loss}, per channel score: {per_ch_score}")
+
+    losses = np.array(losses) / len(loader)
+    final_loss = np.sum(losses)
+    final_std = np.std(losses)
+
+    hd_loss_per_channel = np.array(hd_loss_per_channel) / len(loader)
+
+    final_hd_loss = np.sum(hd_loss_per_channel)
+    final_hd_std = np.std(hd_loss_per_channel)
+
+    final_hd_loss_per_channel = np.sum(hd_loss_per_channel, axis=0)
+    final_hd_std_per_channel = np.std(hd_loss_per_channel, axis=0)
+
+    print(len(loader))
+
+    per_channel_loss_mean = np.mean(all_per_channel_loss, axis=0)
+    per_channel_loss_std = np.std(all_per_channel_loss, axis=0)
+
+    return (final_loss, final_std, per_channel_loss_mean, per_channel_loss_std,
+            final_hd_loss, final_hd_std, final_hd_loss_per_channel, final_hd_std_per_channel)
+
+
+def save_images(image, name):
+    print(f"Now saving image: {name}")
+    output_path = "../results/test_outputs"
+
+    for index in range(image.shape[0]):
+        slice = image[index].detach().cpu().numpy()
+        slice = slice.squeeze()
+        nib_image = nib.Nifti1Image(slice, affine=np.eye(4))
+        nib.save(nib_image, os.path.join(output_path, name + "_" + str(index) + "_output.nii"))
+
+
+def get_included_files(data_dir, hospital_name):
+    files = [file for file in os.listdir(data_dir) if not file.startswith(".")]
+    files = [file for file in files if hospital_name in file]
+
+    extracted_ids, _ = get_values_from_pattern(files, pattern=r".*IXI(\d+)-.*\.nii", match_group=1)
+
+    return extracted_ids
+
+
+def get_values_from_pattern(list_of_string, pattern, match_group=1):
+    extracted_nums = []
+    extracted_strings = []
+
+    for string in list_of_string:
+        match = re.search(pattern, string)
+        if match:
+            id = match.group(match_group)
+            if id not in extracted_nums:
+                extracted_nums.append(id)
+                extracted_strings.append(string)
+
+    return extracted_nums, extracted_strings
+
+
 def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--batchSz', type=int, default=1)
-    parser.add_argument('--dataset_name', type=str, default="iseg2017")
+    parser.add_argument('--dataset_name', type=str, default="ixi_segmentation")
     parser.add_argument('--dim', nargs="+", type=int, default=(64, 64, 64))
     parser.add_argument('--nEpochs', type=int, default=250)
-
-    parser.add_argument('--classes', type=int, default=4)
+    parser.add_argument('--mode', type=str, default="test")
+    parser.add_argument('--classes', type=int, default=3)
     parser.add_argument('--samples_train', type=int, default=1)
     parser.add_argument('--samples_val', type=int, default=1)
     parser.add_argument('--split', type=float, default=0.8)
-    parser.add_argument('--inChannels', type=int, default=2)
-    parser.add_argument('--inModalities', type=int, default=2)
+    parser.add_argument('--inChannels', type=int, default=1)
+    parser.add_argument('--inModalities', type=int, default=1)
+    parser.add_argument('--normalization', default='full_volume_mean', type=str,
+                        help='Tensor normalization: options ,max_min,',
+                        choices=('max_min', 'full_volume_mean', 'brats', 'max', 'mean'))
+    parser.add_argument('--augmentation', action='store_true', default=False)
     parser.add_argument('--fold_id', default='1', type=str, help='Select subject for fold validation')
     parser.add_argument('--lr', default=1e-2, type=float,
                         help='learning rate (default: 1e-3)')
-    parser.add_argument('--cuda', action='store_true', default=True)
+    parser.add_argument('--cuda', action='store_true', default=False)
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='path to latest checkpoint (default: none)')
     parser.add_argument('--model', type=str, default='UNET3D',
@@ -64,7 +155,7 @@ def get_arguments():
     parser.add_argument('--opt', type=str, default='sgd',
                         choices=('sgd', 'adam', 'rmsprop'))
     parser.add_argument('--pretrained',
-                        default='../saved_models/UNET3D_checkpoints/UNET3D_25_05___15_15_iseg2017_/UNET3D_25_05___15_15_iseg2017__last_epoch.pth',
+                        default='../saved_models/UNET3D_checkpoints/UNET3D_02_04___23_45_ixi_segmentation_/UNET3D_02_04___23_45_ixi_segmentation__last_epoch.pth',
                         type=str, metavar='PATH',
                         help='path to pretrained model')
 
@@ -78,16 +169,6 @@ def get_arguments():
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-
-
-
 
 '''
 
