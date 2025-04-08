@@ -5,3 +5,6 @@ env/
 __pycache__/
 *.nii
 *.nii.gz
+.idea/
+runs/
+saved_models/
