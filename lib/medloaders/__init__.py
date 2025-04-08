@@ -8,6 +8,7 @@ from .brats2020 import MICCAIBraTS2020
 from .covid_ct_dataset import CovidCTDataset
 from .iseg2017 import MRIDatasetISEG2017
 from .iseg2019 import MRIDatasetISEG2019
+from .ixi_segmentation import IXISegmentation
 from .ixi_t1_t2 import IXIMRIdataset
 from .miccai_2019_pathology import MICCAI2019_gleason_pathology
 from .mrbrains2018 import MRIDatasetMRBRAINS2018
@@ -123,6 +124,15 @@ def generate_datasets(args, path='.././datasets'):
 
         val_loader = COVID_Seg_Dataset(mode='val', dataset_path=path, crop_dim=args.dim,
                                        fold=0, samples=samples_val)
+
+    elif args.dataset_name == "ixi_segmentation":
+        if args.mode == 'train':
+            train_loader = IXISegmentation(mode='train', args=args)
+            val_loader = IXISegmentation(mode='val', args=args)
+        else:
+            train_loader = IXISegmentation(mode='test', args=args)
+            val_loader = IXISegmentation(mode='test', args=args)
+
     training_generator = DataLoader(train_loader, **params)
     val_generator = DataLoader(val_loader, **params)
 
