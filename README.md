@@ -12,6 +12,8 @@
 
 We strongly believe in open and **reproducible deep learning research**. Our goal is to implement an open-source **medical image segmentation library of state of the art 3D deep neural networks in PyTorch**. We also implemented a bunch of data loaders of the most common medical image datasets.  This project started as an [MSc Thesis](https://nemertes.lis.upatras.gr/jspui/handle/10889/12754 "MSc thesis link") and is currently under further development. Although this work was initially focused on **3D multi-modal brain MRI segmentation** we are slowly adding more architectures and data-loaders.  
 
+*The changes from the original repository* - This fork adds the segmentation of white-matter and gray-matter regions for the IXI dataset.
+
 #### Top priorities 21-07
 [Update] 21-07 We have just received a brand new GPU. The project developedment was postponed due to lack of computational resources. We will be back with more updates. Please Watch our Github repository for releases to be notified. We are always looking for passionate open-source contributos. Full credits will be given.
 
@@ -65,15 +67,16 @@ We strongly believe in open and **reproducible deep learning research**. Our goa
 ## Implemented medical imaging data-loaders
 
 
-|Task|Data Info/ Modalities| Train/Test | Volume size | Classes | Dataset size (GB)|
-|---|---|---|---|---|---|
-| [Iseg 2017](http://iseg2017.web.unc.edu/ "Official iseg-2017 dataset page")| T1, T2 | 10 / 10    |144x192x256|4| 0.72 |
-| [Iseg 2019](http://iseg2019.web.unc.edu/ "Official site")| T1, T2 | 10 / 13   |144x192x256|4| 0.75 |
-| [MICCAI BraTs2018](https://www.med.upenn.edu/sbia/brats2018/data.html "Brain Tumor Segmentation Challenge 2018") |FLAIR, T1w, T1gd,T2w |285 / - |240x240x155|9 or 4|2.4|
-|  [MICCAI BraTs2019](https://www.med.upenn.edu/cbica/brats2019/data.html  "Brain Tumor Segmentation Challenge 2019") |FLAIR, T1w, T1gd,T2w |335 / 125 |240x240x155|9 or 4|4|
-| [Mrbrains 2018](https://mrbrains18.isi.uu.nl/ "Mrbrains 2018 official website") |FLAIR, T1w, T1gd,T2w |8 |240x240x48|9 or 4|0.5|
-|[IXI brain development Dataset ](https://brain-development.org/ixi-dataset/  "IXI Dataset")| T1,T2 **no labels** | 581 |(110~150)x256x256|-|8.7|
-|[MICCAI Gleason 2019 Challenge](https://gleason2019.grand-challenge.org/ "MICCAI2019 Gleason challenge")| 2D pathology images | ~250 |5K x 5K|-|2.5|
+| Task                                                                                                                                                           |Data Info/ Modalities| Train/Test | Volume size       | Classes | Dataset size (GB) |
+|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---|------------|-------------------|---------|-------------------|
+| [Iseg 2017](http://iseg2017.web.unc.edu/ "Official iseg-2017 dataset page")                                                                                    | T1, T2 | 10 / 10    | 144x192x256       | 4       | 0.72              |
+| [Iseg 2019](http://iseg2019.web.unc.edu/ "Official site")                                                                                                      | T1, T2 | 10 / 13    | 144x192x256       | 4       | 0.75              |
+| [MICCAI BraTs2018](https://www.med.upenn.edu/sbia/brats2018/data.html "Brain Tumor Segmentation Challenge 2018")                                               |FLAIR, T1w, T1gd,T2w | 285 / -    | 240x240x155       | 9 or 4  | 2.4               |
+| [MICCAI BraTs2019](https://www.med.upenn.edu/cbica/brats2019/data.html  "Brain Tumor Segmentation Challenge 2019")                                             |FLAIR, T1w, T1gd,T2w | 335 / 125  | 240x240x155       | 9 or 4  | 4                 |
+| [Mrbrains 2018](https://mrbrains18.isi.uu.nl/ "Mrbrains 2018 official website")                                                                                |FLAIR, T1w, T1gd,T2w | 8          | 240x240x48        | 9 or 4  | 0.5               |
+| [IXI brain development Dataset ](https://brain-development.org/ixi-dataset/  "IXI Dataset")                                                                    | T1,T2 **no labels** | 581        | (110~150)x256x256 | -       | 8.7               |
+| [IXI brain development Dataset (Segmentation) ](https://www.kaggle.com/datasets/hamedamin/preprocessed-oasis-and-epilepsy-and-ixi  "IXI Segmentation Dataset") | T1 | 377        | 113x144x113       | 3       | 9.53              |
+| [MICCAI Gleason 2019 Challenge](https://gleason2019.grand-challenge.org/ "MICCAI2019 Gleason challenge")                                                       | 2D pathology images | ~250       | 5K x 5K           | -       | 2.5               |
 
 
 
@@ -112,6 +115,10 @@ python ./examples/train_mrbrains_9_classes.py --args
 - For MICCAI 2019 Gleason Challenge
 ```
 python ./examples/test_miccai_2019.py --args
+```
+- For IXI Segmentation (3 classes)
+```
+python ./examples/train_ixi_segmentation.py --args
 ```
 -  The arguments that you can modify are extensively listed in the [manual](./manual/README.md).
 ## Inference 

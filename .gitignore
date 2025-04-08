@@ -1,0 +1,7 @@
+venv/
+env/
+.vscode/
+.env
+__pycache__/
+*.nii
+*.nii.gz
