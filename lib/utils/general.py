@@ -84,7 +84,12 @@ def prepare_input(input_tuple, inModalities=-1, inChannels=-1, cuda=False, args=
         input_tensor, target = input_tuple
 
     if in_cuda:
-        input_tensor, target = input_tensor.cuda(), target.cuda()
+        if torch.backends.mps.is_available():
+            device = torch.device("mps")
+        elif torch.cuda.is_available():
+            device = torch.device("cuda")
+
+        input_tensor, target = input_tensor.to(device=device), target.to(device=device)
 
     return input_tensor, target
 
